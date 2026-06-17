@@ -3,33 +3,59 @@ import { geminiApiKey, name } from './hidden.js';
 import { getWeatherDataForCity } from './API-requests.js';
 
 async function callGeminiAPI(finalPrompt, apiKey) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    let model = "gemini-2.5-flash"; 
+    let url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: finalPrompt }] }]
-            })
-        });
+    const maxRetries = 3;
 
-        if (!response.ok) throw new Error(`Gemini API Error: ${response.statusText}`);
-        
-        const result = await response.json();
-        return result.candidates[0].content.parts[0].text;
-    } catch (error) {
-        console.error("Failed to communicate with Gemini:", error);
-        return null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: finalPrompt }] }]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API returned status ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            return result.candidates[0].content.parts[0].text;
+
+        } catch (error) {
+            console.warn(`Attempt ${attempt} on ${model} failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                console.error("All retry attempts exhausted.");
+                return null;
+            }
+
+            if (attempt === 1) {
+                model = "gemini-2.5-flash-lite";
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                console.log(`Switching backup model to ${model}...`);
+            }
+
+            // 3. Exponential Backoff + Jitter (e.g., 2s, 4s + a random variance)
+            const baseDelay = Math.pow(2, attempt) * 1000; 
+            const jitter = Math.random() * 1000; 
+            const finalDelay = baseDelay + jitter;
+
+            console.log(`Retrying in ${(finalDelay / 1000).toFixed(2)} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, finalDelay));
+        }
     }
 }
 
 function saveReportToDesktop(reportText) {
     try {
-        const filename = `weather_report_daily.txt`;
+        const filename = "C:\\Users\\David\\Downloads\\weather_report_daily.txt";
         
         fs.writeFileSync(filename, reportText, 'utf8');
-        console.log(`Success! Updated your daily report: ${filename}`);
+        console.log(`Success! Updated your daily report in Downloads: ${filename}`);
     } catch (error) {
         console.error("Failed to write file to disk:", error);
     }
@@ -45,14 +71,27 @@ async function main() {
     
     const currentTemp = weatherData.current?.temperature_2m;
     const currentWind = weatherData.current?.wind_speed_10m;
-    
+
     // Using safe array optional chaining (?.[index]) to prevent crashes if a key is missing
     const tomorrowMorningTemp = weatherData.hourly?.temperature_2m?.[30] || "mid-70s"; 
     const tomorrowAfternoonTemp = weatherData.hourly?.temperature_2m?.[38] || "mid-80s";
-    const tomorrowRainChance = weatherData.hourly?.precipitation_probability?.[30] || 0;
     const tomorrowWind = weatherData.hourly?.wind_speed_10m?.[34] || "12-15";
 
-    // Format today's real-world execution date beautifully
+    const toFahrenheit = (c) => typeof c === 'number' ? Math.round((c * 9) / 5 + 32) : c;
+    const toMPH = (kmh) => typeof kmh === 'number' ? Math.round(kmh * 0.621371) : kmh;
+
+    const currentTempF = toFahrenheit(currentTemp);
+    const currentWindMPH = toMPH(currentWind);
+    const tomorrowMorningTempF = toFahrenheit(tomorrowMorningTemp);
+    const tomorrowAfternoonTempF = toFahrenheit(tomorrowAfternoonTemp);
+    const tomorrowWindMPH = toMPH(tomorrowWind);
+
+    const tomorrowCampRainHours = weatherData.hourly?.precipitation_probability?.slice(29, 45) || [];
+    const tomorrowRainChance = tomorrowCampRainHours.length > 0 ? Math.max(...tomorrowCampRainHours) : 0;
+
+    // Keep this line so you can see your true percentage arrays fill up!
+    console.log("DEBUG - Raw Rain Probabilities (%):", tomorrowCampRainHours);
+
     const todayFormatted = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
@@ -71,7 +110,7 @@ async function main() {
     CRITICAL FORMATTING RULES:
     1. Output strictly in PLAIN TEXT. Do not use any markdown bolding (**), headers (#), bullet points, or special characters.
     2. The length must be strictly between 500 and 1000 characters.
-    3. Avoid using overly complicated workds such as "blustery" or "exfoliation"
+    3. Avoid using overly complicated words such as "blustery" or "exfoliation"
     
     TIMING & CONTEXT PERSPECTIVE:
     - This report is read by a single camp counselor named ${name} at around dinnertime the day it was created. 
@@ -79,12 +118,13 @@ async function main() {
     - Emphasize the forecast for TOMORROW morning and afternoon so they can plan accordingly.
     
     LIVE WEATHER DATA TO INTEGRATE (ONLY USE IMPERIAL SYSTEM FOR TEMPERATURE AND WIND SPEED):
-    - Current Tonight Temperature: ${currentTemp}°C
-    - Current Tonight Wind Speed: ${currentWind} m/s
-    - Tomorrow Early Morning Run Temp: ${tomorrowMorningTemp}°C
-    - Tomorrow Afternoon Peak Temp: ${tomorrowAfternoonTemp}°C
-    - Tomorrow Rain/Precipitation Probability: ${tomorrowRainChance}%
-    - Tomorrow Average Wind Speed: ${tomorrowWind} m/s
+    - Current Tonight Temperature: ${currentTempF}°F
+    - Current Tonight Wind Speed: ${currentWindMPH} mph
+    - Tomorrow Early Morning Run Temp: ${tomorrowMorningTempF}°F
+    - Tomorrow Afternoon Peak Temp: ${tomorrowAfternoonTempF}°F
+    - Tomorrow Hourly Rain Forecast: ${tomorrowCampRainHours}
+    - Tomorrow Rain Risk: ${tomorrowRainChance}%
+    - Tomorrow Average Wind Speed: ${tomorrowWindMPH} mph
     `;   
     const aiGeneratedDraft = await callGeminiAPI(prompt, GEMINI_API_KEY);
 
@@ -93,9 +133,7 @@ async function main() {
         return;
     }
 
-    if (aiGeneratedDraft) {
-        saveReportToDesktop(aiGeneratedDraft);
-    }
+    saveReportToDesktop(aiGeneratedDraft);
 }
 
 main();

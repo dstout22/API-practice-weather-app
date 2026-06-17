@@ -5,7 +5,8 @@ async function getCoordinates(city) {
 }
 
 async function getWeatherData(lattitude, longitude) {
-    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lattitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m`);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lattitude}&longitude=${longitude}&current=temperature_2m,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability&timezone=America%2FNew_York&models=best_match`;
+    const response = await fetch(url);    
     const data = await response.json();
     return data;
 }
