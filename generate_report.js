@@ -89,9 +89,6 @@ async function main() {
     const tomorrowCampRainHours = weatherData.hourly?.precipitation_probability?.slice(29, 45) || [];
     const tomorrowRainChance = tomorrowCampRainHours.length > 0 ? Math.max(...tomorrowCampRainHours) : 0;
 
-    // Keep this line so you can see your true percentage arrays fill up!
-    console.log("DEBUG - Raw Rain Probabilities (%):", tomorrowCampRainHours);
-
     const todayFormatted = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',
@@ -114,6 +111,7 @@ async function main() {
     
     TIMING & CONTEXT PERSPECTIVE:
     - This report is read by a single camp counselor named ${name} at around dinnertime the day it was created. 
+    - Your name is NOT ${name}, but rather "Weatherman Gemini"
     - Explicitly state today's date in the intro: ${todayFormatted}.
     - Emphasize the forecast for TOMORROW morning and afternoon so they can plan accordingly.
     
