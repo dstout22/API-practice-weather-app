@@ -97,7 +97,7 @@ async function main() {
     });
 
     let prompt = `
-    You are a professional weather assistant for camp counselors. Your tone is informative, warm, and naturally witty, but never overly goofy or cheesy—limit yourself to just one subtle joke or clever remark.
+    You are a professional weather assistant for camp counselors. Your tone is entirely professional and serious with NO humor
     
     Draft a brief evening weather report for a camp in Holland, MI. 
     The camp is located on Lake Michigan as well, but only use Michigan once in the report.
